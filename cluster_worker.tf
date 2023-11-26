@@ -1,8 +1,8 @@
 resource "aws_instance" "worker" {
   count = 0
 
-  ami                  = local.amazon_linux_2023_id
-  instance_type        = "t4g.small" # Free-tier until 2023-12-31
+  ami                  = local.amazon_linux_2023_x86_id
+  instance_type        = "t3.small"
   iam_instance_profile = aws_iam_instance_profile.worker.name
   key_name             = aws_key_pair.cluster_key.key_name
   subnet_id = count.index % 2 == 0 ? (
