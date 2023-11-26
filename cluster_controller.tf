@@ -37,6 +37,10 @@ resource "aws_instance" "controller" {
     delete_on_termination = true
   }
 
+  metadata_options {
+    instance_metadata_tags ="enabled"
+  }
+
   tags = {
     Name = "${var.name_prefix}-controller-ec2"
   }
