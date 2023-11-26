@@ -14,7 +14,7 @@ resource "aws_instance" "controller" {
     lookup(module.security_groups.security_group_ids, "ec2-k8s-controller")
   ]
   user_data = templatefile(
-    "userdata/cluster_node.yaml.tfpl",
+    "userdata/cluster_node.yaml.tftpl",
     {
       ARCH                       = "amd64"
       OS                         = "linux"
