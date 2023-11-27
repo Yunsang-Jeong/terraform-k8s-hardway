@@ -16,16 +16,18 @@ resource "aws_instance" "controller" {
   user_data = templatefile(
     "userdata/cluster_node.yaml.tftpl",
     {
-      ARCH                       = "amd64"
-      OS                         = "linux"
-      CONTAINERD_VERSION         = "1.7.9"
-      RUNC_VERSION               = "1.1.10"
-      ENI_PLUGINS_VERSION        = "1.3.0"
-      KUBERNETES_RELEASE         = "1.28.4"
-      KUBERNETES_PKG_RELEASE     = "0.4.0"
-      SYSTEMD_CONTAINERD_SERVICE = indent(4, file("configurations/containerd.service"))
-      SYSTEMD_KUBELET_SERVICE    = indent(4, file("configurations/kubelet.service"))
-      SYSTEMD_KUBEADM_CONFIG     = indent(4, file("configurations/10-kubeadm.conf"))
+      ARCH                               = "amd64"
+      OS                                 = "linux"
+      CONTAINERD_VERSION                 = "1.7.9"
+      CRICTL_VERSION                     = "1.28.0"
+      RUNC_VERSION                       = "1.1.10"
+      ENI_PLUGINS_VERSION                = "1.3.0"
+      KUBERNETES_RELEASE                 = "1.28.4"
+      KUBERNETES_PKG_RELEASE             = "0.4.0"
+      SYSTEMD_CONTAINERD_SERVICE         = replace(indent(4, file("${path.root}/configurations/containerd/containerd.service")), "$", "\\$")
+      CONTAINERD_CONFIG                  = replace(indent(4, file("${path.root}/configurations/containerd/config.toml")), "$", "\\$")
+      SYSTEMD_KUBELET_SERVICE            = replace(indent(4, file("${path.root}/configurations/kubelet/kubelet.service")), "$", "\\$")
+      SYSTEMD_KUBELET_DROPIN_FOR_KUBEADM = replace(indent(4, file("${path.root}/configurations/kubelet/10-kubeadm.conf")), "$", "\\$")
     }
   )
 
