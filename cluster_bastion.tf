@@ -1,18 +1,18 @@
 resource "aws_instance" "bastion" {
-  ami                  = local.amazon_linux_2023_id
+  ami                  = local.amazon_linux_2023_arm64_id
   instance_type        = "t4g.small" # Free-tier until 2023-12-31
   iam_instance_profile = aws_iam_instance_profile.bastion_profile.name
-  user_data = templatefile(
-    "templates/bastion.yaml.tftpl", 
-    {
-      PRIVATE_KEY_OPENSSH = aws_ssm_parameter.cluster_key.name
-    }
-  )
-  subnet_id = lookup(module.network.subnet_ids, "public-a")
+  subnet_id            = lookup(module.network.subnet_ids, "public-a")
   vpc_security_group_ids = [
     lookup(module.security_groups.security_group_ids, "ec2-bastion"),
   ]
   associate_public_ip_address = true
+  user_data = templatefile(
+    "userdata/bastion.yaml.tftpl",
+    {
+      PRIVATE_KEY_OPENSSH = aws_ssm_parameter.cluster_key.name
+    }
+  )
 
   root_block_device {
     volume_type           = "gp3"

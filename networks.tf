@@ -10,6 +10,7 @@ module "network" {
       availability_zone     = "ap-northeast-2a"
       cidr_block            = "10.0.0.0/18"
       enable_route_with_igw = true
+      create_nat            = true
     },
     {
       identifier            = "public-c"
@@ -21,14 +22,14 @@ module "network" {
       identifier            = "private-a"
       availability_zone     = "ap-northeast-2a"
       cidr_block            = "10.0.128.0/18"
-      enable_route_with_igw = false
+      enable_route_with_nat = true
       additional_tag        = {}
     },
     {
       identifier            = "private-c"
       availability_zone     = "ap-northeast-2c"
       cidr_block            = "10.0.192.0/18"
-      enable_route_with_igw = false
+      enable_route_with_nat = true
       additional_tag        = {}
     },
   ]

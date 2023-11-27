@@ -1,0 +1,83 @@
+#cloud-config
+
+#
+# Reference
+# - https://kubernetes.io/ko/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+# - https://github.com/containerd/containerd/blob/main/docs/getting-started.md
+#
+runcmd:
+  - dnf install -y iptables conntrack socat iproute-tc
+  #
+  # [containerd]
+  #
+  - wget "https://github.com/containerd/containerd/releases/download/v${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION}-${OS}-${ARCH}.tar.gz" -O containerd.tar.gz
+  - tar Cxzf /usr/local containerd.tar.gz
+  - |
+    cat <<EOF > /etc/systemd/system/containerd.service
+    ${SYSTEMD_CONTAINERD_SERVICE}
+    EOF
+  - mkdir -p /etc/containerd
+  - |
+    cat <<EOF > /etc/containerd/config.toml
+    ${CONTAINERD_CONFIG}
+    EOF
+
+  #
+  # [runc]
+  #
+  - wget "https://github.com/opencontainers/runc/releases/download/v${RUNC_VERSION}/runc.${ARCH}" -O /usr/bin/runc
+  - chmod 755 /usr/bin/runc
+  
+  #
+  # [CNI-plugins]
+  #
+  - wget "https://github.com/containernetworking/plugins/releases/download/v${ENI_PLUGINS_VERSION}/cni-plugins-${OS}-${ARCH}-v${ENI_PLUGINS_VERSION}.tgz" -O cni-plugins 
+  - mkdir -p /opt/cni/bin
+  - tar Cxzf /opt/cni/bin cni-plugins
+
+  #
+  # [crictl]
+  #
+  - wget "https://github.com/kubernetes-sigs/cri-tools/releases/download/v${CRICTL_VERSION}/crictl-v${CRICTL_VERSION}-linux-${ARCH}.tar.gz" -O crictl.tar.gz
+  - tar Cxzf /usr/local/bin/ crictl.tar.gz
+
+  #
+  # [kubeadm, kubelet, kubectl]
+  #
+  - wget "https://dl.k8s.io/release/v${KUBERNETES_RELEASE}/bin/${OS}/${ARCH}/"{kubeadm,kubelet,kubectl} -P /usr/bin
+  - chmod +x /usr/bin/{kubeadm,kubelet,kubectl}
+  - mkdir -p /etc/systemd/system/kubelet.service.d
+  - |
+    cat <<EOF > /etc/systemd/system/kubelet.service
+    ${SYSTEMD_KUBELET_SERVICE}
+    EOF
+  - |
+    cat <<EOF > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    ${SYSTEMD_KUBELET_DROPIN_FOR_KUBEADM}
+    EOF
+
+  #
+  # set system-module
+  #
+  - |
+    cat <<EOF | sudo tee /etc/modules-load.d/kubernetes.conf
+    overlay
+    br_netfilter
+    EOF
+  - modprobe overlay
+  - modprobe br_netfilter
+  - |
+    cat <<EOF >  /etc/sysctl.d/10-kubernetes.conf
+    net.ipv4.ip_forward                 = 1
+    net.bridge.bridge-nf-call-ip6tables = 1
+    net.bridge.bridge-nf-call-iptables  = 1
+    EOF
+  - sysctl --system
+  - swapoff -a
+
+  #
+  # load all
+  #
+  - systemctl daemon-reload
+  - systemctl enable --now containerd
+  - systemctl enable kubelet
