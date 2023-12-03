@@ -12,3 +12,14 @@ resource "aws_ssm_parameter" "cluster_key" {
   type  = "SecureString"
   value = trim(tls_private_key.cluster_key.private_key_openssh, "\n")
 }
+
+resource "aws_ssm_parameter" "kubeadm_join_key" {
+  name  = "/k8s/cluster-join-key"
+  type  = "SecureString"
+  value = "init,init,init"
+
+  lifecycle {
+    ignore_changes = [value, insecure_value]
+    replace_triggered_by = [aws_instance.controller.private_ip]
+  }
+}
