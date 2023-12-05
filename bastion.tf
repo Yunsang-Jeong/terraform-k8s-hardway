@@ -8,7 +8,7 @@ resource "aws_instance" "bastion" {
   ]
   associate_public_ip_address = true
   user_data = templatefile(
-    "userdata/bastion.yaml.tftpl",
+    "userdata/bastion.sh.tftpl",
     {
       PRIVATE_KEY_OPENSSH = aws_ssm_parameter.cluster_key.name
     }
@@ -46,7 +46,7 @@ resource "aws_iam_role_policy_attachment" "bastion" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-resource "aws_iam_role_policy" "test_policy" {
+resource "aws_iam_role_policy" "basation_get_cluster_key" {
   name = "get-cluster-key"
   role = aws_iam_role.bastion.name
   policy = jsonencode({

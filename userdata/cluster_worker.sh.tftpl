@@ -1,0 +1,102 @@
+#!/bin/bash
+
+#
+# Reference
+# https://kubernetes.io/ko/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+# https://github.com/containerd/containerd/blob/main/docs/getting-started.md
+#
+
+#
+# [packages]
+#
+dnf install -y iptables conntrack socat iproute-tc
+
+#
+# [containerd]
+#
+wget "https://github.com/containerd/containerd/releases/download/v${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION}-${OS}-${ARCH}.tar.gz" -O containerd.tar.gz
+tar Cxzf /usr/local containerd.tar.gz
+cat > /etc/systemd/system/containerd.service <<EOF 
+${SYSTEMD_CONTAINERD_SERVICE}
+EOF
+mkdir -p /etc/containerd
+cat > /etc/containerd/config.toml <<EOF
+${CONTAINERD_CONFIG}
+EOF
+
+#
+# [runc]
+#
+wget "https://github.com/opencontainers/runc/releases/download/v${RUNC_VERSION}/runc.${ARCH}" -O /usr/bin/runc
+chmod 755 /usr/bin/runc
+
+#
+# [CNI-plugins]
+#
+wget "https://github.com/containernetworking/plugins/releases/download/v${ENI_PLUGINS_VERSION}/cni-plugins-${OS}-${ARCH}-v${ENI_PLUGINS_VERSION}.tgz" -O cni-plugins 
+mkdir -p /opt/cni/bin
+tar Cxzf /opt/cni/bin cni-plugins
+mkdir -p /etc/cni/net.d/
+cat > /etc/cni/net.d/10-containerd-net.conflist <<EOF
+${ENI_PLUGINS_BASIC_CONFIG}
+EOF
+
+#
+# [crictl]
+#
+wget "https://github.com/kubernetes-sigs/cri-tools/releases/download/v${CRICTL_VERSION}/crictl-v${CRICTL_VERSION}-linux-${ARCH}.tar.gz" -O crictl.tar.gz
+tar Cxzf /usr/local/bin/ crictl.tar.gz
+
+#
+# [kubeadm, kubelet, kubectl]
+#
+wget "https://dl.k8s.io/release/v${KUBERNETES_RELEASE}/bin/${OS}/${ARCH}/"{kubeadm,kubelet,kubectl} -P /usr/bin
+chmod +x /usr/bin/{kubeadm,kubelet,kubectl}
+cat > /etc/systemd/system/kubelet.service <<EOF 
+${SYSTEMD_KUBELET_SERVICE}
+EOF
+mkdir -p /etc/systemd/system/kubelet.service.d
+cat > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf <<EOF 
+${SYSTEMD_KUBELET_DROPIN_FOR_KUBEADM}
+EOF
+
+#
+# set system-module
+#
+cat > /etc/modules-load.d/kubernetes.conf <<EOF
+overlay
+br_netfilter
+EOF
+modprobe overlay
+modprobe br_netfilter
+cat > /etc/sysctl.d/10-kubernetes.conf <<EOF
+  net.ipv4.ip_forward                 = 1
+  net.bridge.bridge-nf-call-ip6tables = 1
+  net.bridge.bridge-nf-call-iptables  = 1
+EOF
+sysctl --system
+swapoff -a
+systemctl daemon-reload
+systemctl enable --now containerd
+systemctl enable kubelet
+
+#
+# [kubeadm]
+#
+
+REGEX_API="(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])"
+REGEX_TOKEN="[a-z0-9]{6}.[a-z0-9]{16}"
+REGEX_HASH="[a-z0-9]{64}"
+while :
+do
+  key=$(aws ssm get-parameter --name ${CLUSTER_JOIN_KEY_PARAM} --with-decryption --query 'Parameter.Value' --output=text --region ap-northeast-2)
+  IFS=',' read -r -a key_arr <<< "$key"
+
+  if [[ $${key_arr[0]} =~ $REGEX_API ]] && [[ $${key_arr[1]} =~ $REGEX_TOKEN ]] && [[ $${key_arr[2]} =~ $REGEX_HASH ]]; then
+    break
+  fi
+  echo "wait..."
+  sleep 2
+done
+
+kubeadm join $${key_arr[0]} --token $${key_arr[1]}  --discovery-token-ca-cert-hash sha256:$${key_arr[2]}
